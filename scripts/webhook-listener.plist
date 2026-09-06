@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- LaunchAgent template for the BlueBubbles webhook listener (runs as clarioinc, no sudo).
+     Placeholders __NODE__, __REPO__, __PORT__ are filled by scripts/listener-install.sh.
+     Installed to ~/Library/LaunchAgents/com.clario.bb-webhook-listener.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.clario.bb-webhook-listener</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE__</string>
+    <string>__REPO__/scripts/webhook-listener.mjs</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__REPO__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>WEBHOOK_PORT</key>
+    <string>__PORT__</string>
+    <key>WEBHOOK_HOST</key>
+    <string>127.0.0.1</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>__REPO__/logs/listener.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__REPO__/logs/listener.err.log</string>
+</dict>
+</plist>
