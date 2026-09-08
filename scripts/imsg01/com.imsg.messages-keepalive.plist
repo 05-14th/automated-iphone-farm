@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Per-user keepalive LaunchAgent for imsg01 (guide step 23). __SCRIPT__/__HOME__ are filled by keepalive-install.sh.
+     Installed to ~imsg01/Library/LaunchAgents/com.imsg.messages-keepalive.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.imsg.messages-keepalive</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__SCRIPT__</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/messages-keepalive.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/messages-keepalive.launchd.log</string>
+</dict>
+</plist>
