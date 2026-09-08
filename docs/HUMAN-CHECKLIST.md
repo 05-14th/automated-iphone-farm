@@ -42,7 +42,7 @@ The SSH key already exists. You will authorise it inside the imsg01 session in H
    - confirm the Apple Account 01 email is listed under *You can be reached at*;
    - select that email under **Start new conversations from**;
    - leave **Enable Messages in iCloud** OFF.
-4. Open Terminal in the imsg01 session and paste this (authorises Claude's control key):
+4. ~~SSH key authorise~~ — DONE 2026-09-08 (written by Claude via `su`). Kept for reference:
 ```
 mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIn1xe4B7ofss2HK9k4VlbG6ovpoPP27Pqaf/i80LTAP clarioinc->imsg01 control' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
 ```
@@ -50,19 +50,18 @@ mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAA
    recipient) and, if available, to a real iPhone. Confirm blue bubbles and that the
    sender shown is the Apple Account 01 email.  [5, 9]
 
-## H5 — First launch of BlueBubbles inside imsg01  [10, 11, 12]
-Still in the imsg01 session:
-1. Open `/Applications/BlueBubbles.app`. If Gatekeeper blocks it:
-   System Settings > Privacy & Security > **Open Anyway**.
-2. Grant **Full Disk Access** and **Accessibility** when prompted
-   (System Settings > Privacy & Security). Quit and relaunch BlueBubbles afterwards.
-3. In the setup wizard / Settings:
-   - Server password: paste `BB_PASSWORD` from `.env` (Claude will show it).
-   - Local port: **12341**.
-   - Private API: **OFF**. Do not disable SIP.
-   - Proxy / Dynamic DNS / Ngrok / Cloudflare: **Disabled** (localhost only).
-   - Start on login: ON. Auto-start Messages: ON.
-4. Leave BlueBubbles running. Switch back to `clarioinc` (do not log out imsg01).
+## H5 — Grant BlueBubbles its permissions inside imsg01  [10, 11, 12]
+STATUS 2026-09-08: BlueBubbles 1.9.9 is already launched in the imsg01 session and fully
+configured by Claude via its config DB (port 12341, unique password, tutorial skipped,
+Dynamic-DNS proxy pointed at http://127.0.0.1:12341, start-on-login, updates off,
+Private API OFF, SIP ON). It is stuck at "unable to open database file" until it gets
+Full Disk Access. Only the permission clicks remain:
+1. In the imsg01 session open System Settings > Privacy & Security > **Full Disk Access**,
+   click **+**, add `/Applications/BlueBubbles.app`, toggle it ON.
+2. Same for **Accessibility** (needed for the AppleScript send path).
+3. If a Gatekeeper dialog ever appears for BlueBubbles: Privacy & Security > **Open Anyway**.
+4. Tell Claude — it relaunches BlueBubbles from the clarioinc session and verifies
+   `bb.sh ping` on port 12341. Do not log out imsg01; just switch back.
 
 Tell Claude "done with H5". Claude then runs steps 13–16 automatically
 (existing chat, new chat, inbound, idle 30/60/120).
