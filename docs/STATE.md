@@ -148,3 +148,20 @@ destination: default
 - Signature: Developer ID Application: Zachary Shames (WPV275H8W7), hardened runtime, `codesign --verify --deep --strict` passes.
 - Gatekeeper: `spctl -a -vv` returns **rejected / Unnotarized Developer ID**. No `com.apple.quarantine` xattr is present (curl download), so Gatekeeper should not block the first launch; if it does, an admin can `spctl --add` / right-click Open once.
 - Re-capture this file with `scripts/record-state.sh > docs/STATE.md`.
+
+## 2026-09-09 — BlueBubbles operational
+
+- BlueBubbles 1.9.9 running under imsg01 via LaunchAgent `com.imsg.launch-bluebubbles` (gui/502).
+- Full Disk Access granted (system-wide pane, no admin auth prompt appeared).
+- REST API live on http://127.0.0.1:12341; `server/info` reports server_version 1.9.9,
+  os_version 26.3.0, private_api false, proxy_service dynamic-dns.
+- Webhook id 1 -> http://127.0.0.1:12391 (new-message, updated-message, server-update).
+- post-reboot-check.sh: HEALTH OK, 12/12.
+- BLOCKED: `detected_imessage` and `detected_icloud` are null. No Apple Account is signed
+  into Messages under imsg01, so no sender identity exists yet and steps 13-16 cannot run.
+
+### Operating notes
+- imsg01 is currently the foreground console session; clarioinc is switched to the background.
+  Synthetic HID events (computer-use clicks/typing) do NOT reach a background session.
+  AppleScript UI scripting via System Events does work against it.
+- Run commands as imsg01 with `/Users/Shared/imsg-setup/run.sh <script-in-that-dir>` (expect + su).

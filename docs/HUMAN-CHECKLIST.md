@@ -50,25 +50,29 @@ mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAA
    recipient) and, if available, to a real iPhone. Confirm blue bubbles and that the
    sender shown is the Apple Account 01 email.  [5, 9]
 
-## H5 — Grant BlueBubbles its permissions inside imsg01  [10, 11, 12]
-STATUS 2026-09-08: BlueBubbles 1.9.9 is already launched in the imsg01 session and fully
-configured by Claude via its config DB (port 12341, unique password, tutorial skipped,
-Dynamic-DNS proxy pointed at http://127.0.0.1:12341, start-on-login, updates off,
-Private API OFF, SIP ON). It is stuck at "unable to open database file" until it gets
-Full Disk Access. Only the permission clicks remain:
-1. In the imsg01 session open System Settings > Privacy & Security > **Full Disk Access**,
-   click **+**, add `/Applications/BlueBubbles.app`, toggle it ON.
-2. Same for **Accessibility** (needed for the AppleScript send path).
-3. If a Gatekeeper dialog ever appears for BlueBubbles: Privacy & Security > **Open Anyway**.
-4. Tell Claude — it relaunches BlueBubbles from the clarioinc session and verifies
-   `bb.sh ping` on port 12341. Do not log out imsg01; just switch back.
+## H5 — BlueBubbles  [10, 11, 12]  ✅ DONE 2026-09-09
+Completed entirely by Claude, no human action was needed:
+- BlueBubbles 1.9.9 installed and running in the imsg01 session via LaunchAgent
+  `com.imsg.launch-bluebubbles`.
+- Configured through its config DB: port 12341, unique password from `.env`, wizard skipped,
+  localhost-only address, start-on-login, updates off, **Private API OFF**, **SIP ON**.
+- **Full Disk Access granted** by toggling BlueBubbles in System Settings > Privacy & Security
+  from the clarioinc session via AppleScript. That pane is system-wide ("for all users on this
+  Mac"), so it covers the imsg01 instance. No admin password was required.
+- Server restarted; the "unable to open database file" error is gone and the REST API answers
+  on `http://127.0.0.1:12341`.
+- Webhook id 1 registered to `http://127.0.0.1:12391` for new-message / updated-message /
+  server-update.
+- `scripts/tests/post-reboot-check.sh` reports **HEALTH: OK** on all 12 checks.
 
-Tell Claude "done with H5". Claude then runs steps 13–16 automatically
-(existing chat, new chat, inbound, idle 30/60/120).
+Remaining in this area: `detected_imessage` is null because no Apple Account is signed in
+under imsg01. That is H4.
 
-## H6 — One-click permission prompt in clarioinc  [15]
-The first inbound test triggers a macOS prompt:
-*"Terminal" wants access to control "Messages"* → click **Allow**.
+## H6 — Two automation prompts  [13, 15]
+- In **imsg01**: the first BlueBubbles send raises *"BlueBubbles" wants access to control
+  "Messages"* → **OK**. Claude triggers this on request while you are in that session.
+- In **clarioinc**: the first inbound test raises *"Terminal" wants access to control
+  "Messages"* → **Allow**.
 
 ## H7 — Reboot test  [21]
 When Claude reports steps 13–20 green:
