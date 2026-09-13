@@ -34,7 +34,7 @@ Generated 2026-09-10. Sender 1 only. Guide step numbers in brackets.
 | Brand-new-chat API send [14] | PASS delivery / FAIL reporting (Defect A) |
 | Inbound event [15] | PASS |
 | 30/60/120 idle tests [16] | **PASS** (latency, losses, wake) / duplicates per Defect B |
-| Wi-Fi recovery [18] | NOT RUN |
+| Wi-Fi recovery [18] | **PASS** |
 | BlueBubbles restart [19] | PASS (incidental) |
 | Messages restart [20] | PASS (incidental) |
 | Mac reboot/recovery [21] | NOT RUN |
@@ -72,6 +72,29 @@ Re-tested 2026-09-13 09:51Z after the Mac sat untouched since 2026-09-10 14:29Z.
 BlueBubbles was still the SAME process (pid 42961, no restart in 71 h), Messages still
 running, API healthy. A live send returned HTTP 200 with echo latency 723 ms.
 This is a stronger result than the guide's 120-minute requirement.
+
+## Wi-Fi interruption and recovery [18]
+
+Ran 2026-09-13 18:19Z on en1 (the default route). Script re-enables Wi-Fi via an exit trap
+on every path: `scripts/tests/t18-wifi-run.sh`.
+
+| Step | Result |
+|---|---|
+| Wi-Fi off, default route gone | confirmed |
+| Send attempted while offline | accepted (HTTP 200), queued by Messages |
+| Wi-Fi on, network restored | ~4 s |
+| Offline message delivered after recovery | yes, `error=0`, delivered 2 s after link returned |
+| Recovery send | yes, `error=0`, delivered |
+| Message lost | none |
+| Duplicate **message** | none (1 distinct GUID per message) |
+| Manual Messages restart required | no |
+| Manual BlueBubbles restart required | no (same pid 42961 throughout) |
+
+PASS. Recovery is fully automatic. Note the queue-then-deliver behaviour: a send issued
+while offline still returns HTTP 200 and is delivered later, so "accepted" never means
+"delivered". The bridge must treat delivery confirmation, not the API response, as truth.
+
+Duplicate *events* occurred on both sends, consistent with Defect B.
 
 ## Defects
 
@@ -123,8 +146,13 @@ Privacy & Security > Automation if continuous inbound testing is wanted.
 
 ## Gate decision [24-27]
 
-Idle [16] now PASSES, including a 71-hour extended run. Outstanding: Wi-Fi recovery [18]
-and reboot recovery [21]. [18] briefly drops this Mac's own connection (default route is
-Wi-Fi en1) and [21] needs the admin password, so both need the user present.
+Idle [16] PASSES, including a 71-hour extended run. Wi-Fi recovery [18] PASSES.
+
+Outstanding: reboot recovery [21] only. It needs the admin password AND, critically,
+**there is no auto-login configured**: after a restart nothing signs in, so imsg01 never
+starts, Messages never runs and BlueBubbles never launches. The machine sits at a login
+window until a person types a password. That is a standing outage risk for an unattended
+farm and should be fixed (auto-login for imsg01; FileVault is off so it is available)
+before [21] is worth running.
 Defects A and B are handled in the bridge layer, not blockers to sender 1 itself.
 Do NOT proceed to sender 2 [28] until the idle, Wi-Fi and reboot items are green.
