@@ -37,7 +37,7 @@ Generated 2026-09-10. Sender 1 only. Guide step numbers in brackets.
 | Wi-Fi recovery [18] | **PASS** |
 | BlueBubbles restart [19] | PASS (incidental) |
 | Messages restart [20] | PASS (incidental) |
-| Mac reboot/recovery [21] | NOT RUN |
+| Mac reboot/recovery [21] | **PASS with caveat** (see below) |
 | No unexpected duplicates | **FAIL (Defect B)** |
 
 ## Evidence
@@ -96,6 +96,51 @@ while offline still returns HTTP 200 and is delivered later, so "accepted" never
 
 Duplicate *events* occurred on both sends, consistent with Defect B.
 
+## Reboot recovery [21]
+
+Real reboot 2026-09-13 11:25 local (shutdown 11:24, confirmed in `last reboot`).
+
+### What did NOT come back on its own
+
+For 87 minutes after boot the sender was completely offline:
+
+| Component | State after boot, before any login |
+|---|---|
+| imsg01 session | not logged in (no loginwindow process) |
+| Messages under imsg01 | not running |
+| BlueBubbles | not running |
+| Port 12341 | dead |
+| API | no response |
+| Tailscale / Screen Sharing | up (system daemons, unaffected) |
+| Webhook listener | up only because it is a clarioinc LaunchAgent |
+
+Cause: **no auto-login is configured.** The Mac boots to a login window and stops.
+The guide's runbook [37] assumes a human logs into each sender account after boot.
+
+### After logging into imsg01 (12:52)
+
+| Check | Result |
+|---|---|
+| BlueBubbles auto-started with the session | yes, 12:52:42, no manual launch |
+| Port 12341 listening | yes |
+| API ping | 200 |
+| Webhook registration survived reboot | yes, id 1 intact |
+| Messages identity | intact, no re-auth needed |
+| Post-reboot send | HTTP 200, `error=0`, delivered |
+| Echo latency | 2620 ms (first send after cold start; steady state ~700 ms) |
+| Duplicate message | none (1 distinct GUID) |
+
+So recovery is clean *once a session exists*. The caveat is that a session does not
+create itself.
+
+### Recommendation
+
+Enable auto-login for imsg01 (FileVault is off, so it is available; needs admin once).
+Without it, any restart - power cut, macOS update, crash - silently takes the sender
+offline until a human notices. That is a standing outage risk at one sender and an
+unacceptable one at five. If auto-login is rejected on security grounds, a boot-time
+alert is mandatory instead.
+
 ## Defects
 
 ### Defect A — API reports failure on successful send
@@ -146,13 +191,17 @@ Privacy & Security > Automation if continuous inbound testing is wanted.
 
 ## Gate decision [24-27]
 
-Idle [16] PASSES, including a 71-hour extended run. Wi-Fi recovery [18] PASSES.
+**All Phase 1 functional gates now pass.** Existing-chat send, new-chat send, inbound,
+idle 30/60/120 (plus 71 h extended), Wi-Fi recovery, and reboot recovery are green.
 
-Outstanding: reboot recovery [21] only. It needs the admin password AND, critically,
-**there is no auto-login configured**: after a restart nothing signs in, so imsg01 never
-starts, Messages never runs and BlueBubbles never launches. The machine sits at a login
-window until a person types a password. That is a standing outage risk for an unattended
-farm and should be fixed (auto-login for imsg01; FileVault is off so it is available)
-before [21] is worth running.
+Two conditions must be met before sender 2 [28]:
+
+1. **Auto-login for imsg01**, or an equivalent boot-time alert. Reboot leaves the sender
+   dead until a human logs in. Unresolved.
+2. **Defects A and B must be handled in the bridge** before any production traffic:
+   reconcile before retry, and a unique index on provider_guid. These are guide
+   requirements [31/33/35], not optional hardening.
+
+Defect B in particular is not a rare edge case: 8 of 11 outbound sends duplicated.
 Defects A and B are handled in the bridge layer, not blockers to sender 1 itself.
 Do NOT proceed to sender 2 [28] until the idle, Wi-Fi and reboot items are green.
