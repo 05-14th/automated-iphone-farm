@@ -1,3 +1,4 @@
 downloads/
 .env
 logs/
+supabase/.temp/
