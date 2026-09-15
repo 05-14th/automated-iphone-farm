@@ -1,4 +1,6 @@
-downloads/
 .env
+bridge/.env
+bridge/node_modules/
+downloads/
 logs/
 supabase/.temp/

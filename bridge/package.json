@@ -1,0 +1,18 @@
+{
+  "name": "imessage-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Phase 12 sending worker + gateway API for the email-based BlueBubbles iMessage bridge.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "api": "node api/server.mjs",
+    "worker": "node worker/worker.mjs",
+    "health": "node worker/health.mjs",
+    "check": "node --check lib/db.mjs && node --check lib/log.mjs && node --check lib/env.mjs && node --check lib/bluebubbles.mjs && node --check worker/worker.mjs && node --check worker/health.mjs && node --check api/server.mjs && node --check test/e2e.mjs",
+    "e2e": "node test/e2e.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
