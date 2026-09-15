@@ -394,6 +394,11 @@ export async function claimableMessages(senderId, limit = 25) {
     .eq('sender_id', senderId)
     .eq('state', 'queued')
     .eq('direction', 'outbound')
+    // Scheduled sends: a NULL scheduled_for means "send now" (the original
+    // behaviour). A future timestamp keeps the row invisible until it is due.
+    // The timestamp MUST be computed per call - a module-load value would
+    // freeze and the worker would silently stop claiming anything.
+    .or(`scheduled_for.is.null,scheduled_for.lte.${new Date().toISOString()}`)
     .order('queued_at', { ascending: true })
     .limit(limit);
   throwIf(error, 'claimableMessages');

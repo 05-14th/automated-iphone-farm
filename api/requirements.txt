@@ -1,0 +1,13 @@
+# Pinned exactly. Regenerate with: .venv/bin/pip freeze
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+httpx==0.28.1
+supabase==2.31.0
+postgrest==2.31.0
+python-dotenv==1.2.3
+
+# --- test only ---------------------------------------------------------------
+pytest==9.1.1
+pytest-asyncio==1.4.0
