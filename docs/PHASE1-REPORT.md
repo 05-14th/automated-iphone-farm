@@ -141,6 +141,39 @@ offline until a human notices. That is a standing outage risk at one sender and 
 unacceptable one at five. If auto-login is rejected on security grounds, a boot-time
 alert is mandatory instead.
 
+## Recipient reachability and send-path performance (2026-09-15)
+
+Sender identity: meidy@clariocapital.com (an attempted swap to chilldaddygerry@gmail.com left the
+account signed in but never IDS-registered - empty ActiveAccounts/OnlineAccounts and a permanently
+spinning address list. Cleared by quitting Messages and removing the account plists; backups in
+imsg01's `~/diag/`. Treat a spinning "You can be reached at" list as a hard failure, not a delay.)
+
+| Recipient | Delivered | Notes |
+|---|---|---|
+| meidy765@gmail.com | yes, `error=0` | valid two-party test |
+| +17783231234 | yes, `error=0` | valid two-party test |
+| meidy@clariocapital.com | yes, `error=0` | **loopback** - same account as the sender, so it produces both an outbound AND an inbound row. Useless as a test target. |
+| gerryvienlifeflores@gmail.com | no, `error=22` | not registered with Apple |
+| chilldaddygerry@gmail.com | no, `error=22` | not registered with Apple |
+| thisyourman106@gmail.com | no, `error=22` | not registered with Apple |
+
+### The two send paths perform very differently
+
+| Path | Latency | API response |
+|---|---|---|
+| `POST /message/text` into an existing chat | **0.76 s** | clean HTTP 200 |
+| `POST /chat/new` | **75-120 s, always times out** | timeout, but the message DELIVERS |
+
+`chat/new` delivers reliably but never returns in time. This is Defect A at its worst.
+
+**Design consequence:** the worker must create a conversation ONCE via `chat/new`, tolerate the
+timeout, reconcile the result, then use `message/text` with the resulting chat GUID for every
+subsequent send. Treating `chat/new` as the normal send path would cap throughput at roughly one
+message every two minutes and generate a timeout on every single send.
+
+Unreachable addresses also hang ~90-100 s before failing, so reachability must be pre-checked
+rather than discovered per message, or one bad address stalls everything behind it.
+
 ## Defects
 
 ### Defect A — API reports failure on successful send
