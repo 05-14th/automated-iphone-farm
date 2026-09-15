@@ -172,6 +172,8 @@ def test_openapi_documents_every_route(client):
         "/v1/suppressions/{address}",
         "/v1/health",
         "/v1/stats",
+        "/v1/senders",
+        "/v1/senders/{slug}",
     }
     assert expected <= set(spec["paths"])
     # Every documented operation has a summary and a description.

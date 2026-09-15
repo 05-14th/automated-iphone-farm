@@ -107,6 +107,30 @@ not a bug, not a future change, not a direct query.
 | No blind retry | A timed-out send physically cannot be retried until the provider has been checked. |
 | Sending caps | Per-sender hourly, daily and new-conversation limits, plus quiet hours. |
 
+### Current limits on sender01
+
+| Limit | Value |
+|---|---|
+| Per hour | 30 |
+| Per day | 200 |
+| New conversations per day | 20 |
+| Quiet hours | 21:00-08:00 America/Vancouver |
+
+New conversations are capped ten times tighter than ordinary messages on purpose. First
+contact is the only message a recipient who never asked for it can report, and a burst of
+them is the exact pattern Apple bans accounts for.
+
+**A capped message is not rejected.** It stays queued and goes out when the window
+reopens, so nothing is lost overnight. `GET /v1/senders` shows usage, remaining, and when
+each window resets.
+
+To change them (nulls mean no limit, `0` means send nothing):
+
+```sql
+update senders set hourly_cap=20, daily_cap=150 where slug='sender01';
+update senders set quiet_hours_start=null, quiet_hours_end=null where slug='sender01';
+```
+
 **Opt-outs are automatic.** A reply of *stop*, *unsubscribe*, *cancel* and similar suppresses
 that person across every sender immediately, without you doing anything.
 

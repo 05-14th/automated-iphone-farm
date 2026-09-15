@@ -29,6 +29,14 @@ log = logging.getLogger("api.sending")
 # decision. These get 409 (try again later); everything else gets 403.
 TRANSIENT_REASONS = {"in_flight_message_exists"}
 
+# Operating caps and quiet hours [guide step 36]. These are NOT refusals: the
+# message is accepted, enqueued, and left `queued`; the worker sends it when the
+# window reopens. A 403 here would be a lie - the caller would think the message
+# was rejected and would re-post it later, which is how you get duplicates from a
+# system whose whole point is not to send twice. The response is 202 with the cap
+# reason and a retry_after attached, so the caller knows why nothing has moved.
+CAP_REASONS = {"cap_daily", "cap_hourly", "cap_new_conversation", "quiet_hours"}
+
 
 @dataclass(slots=True)
 class EnqueueOutcome:
@@ -117,11 +125,28 @@ async def _enqueue(
     # 3. Conversation (the (contact, sender) thread; FIFO is scoped here).
     conversation = await db.resolve_conversation(contact)
 
-    # 4. THE GATE. Suppression, consent, sender status, sticky match, in-flight.
+    # 4. THE GATE. Suppression, consent, sender status, sticky match, caps, in-flight.
     verdict = await db.can_send(contact["id"])
+    cap_reason: str | None = None
+    retry_after: datetime | None = None
+
     if not verdict.get("allowed"):
         reason = verdict.get("reason", "refused")
-        if reason in TRANSIENT_REASONS:
+
+        if reason in CAP_REASONS:
+            # Cap-blocked, not refused. Fall through and enqueue: the whole point
+            # of a cap is that the message goes out later, unchanged.
+            cap_reason = reason
+            retry_after = _parse_ts(verdict.get("retry_after"))
+            log_context(
+                log,
+                logging.INFO,
+                "accepted but cap-blocked",
+                contact_id=contact["id"],
+                reason=reason,
+                retry_after=verdict.get("retry_after"),
+            )
+        elif reason in TRANSIENT_REASONS:
             raise conflict(
                 "in_flight_message_exists",
                 "Another message is already queued or sending on this conversation. "
@@ -130,7 +155,8 @@ async def _enqueue(
                 contact_id=contact["id"],
                 conversation_id=conversation["id"],
             )
-        raise refused(reason, contact_id=contact["id"], conversation_id=conversation["id"])
+        else:
+            raise refused(reason, contact_id=contact["id"], conversation_id=conversation["id"])
 
     # 5. Enqueue. Nothing has been sent; the worker does that.
     row = await db.enqueue_outbound(
@@ -153,6 +179,7 @@ async def _enqueue(
         sender=(sticky_sender or {}).get("slug"),
         mode=mode,
         scheduled_for=row.get("scheduled_for"),
+        cap_reason=cap_reason,
     )
 
     return EnqueueOutcome(
@@ -168,8 +195,22 @@ async def _enqueue(
             normalized_address=normalized,
             temp_guid=row.get("temp_guid"),
             queued_at=row["queued_at"],
+            cap_blocked=cap_reason is not None,
+            cap_reason=cap_reason,
+            retry_after=retry_after,
         ),
     )
+
+
+def _parse_ts(value: Any) -> datetime | None:
+    """The gate's `retry_after`, which is a Postgres timestamptz rendered as JSON."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:  # pragma: no cover - the database always sends ISO 8601
+        log_context(log, logging.WARNING, "unparsable retry_after from the gate", value=str(value))
+        return None
 
 
 async def resolve_contact_or_404(db: Database, normalized: str) -> dict[str, Any]:

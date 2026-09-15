@@ -23,6 +23,7 @@ import config from '../lib/env.mjs';
 import { createLogger } from '../lib/log.mjs';
 import { BlueBubblesClient } from '../lib/bluebubbles.mjs';
 import * as dbapi from '../lib/db.mjs';
+import { classifyRefusal, retryAfterOf } from '../lib/caps.mjs';
 
 const log = createLogger('worker');
 
@@ -270,16 +271,26 @@ async function processMessage(bb, sender, row) {
   //    this message to be the FIFO head. Its verdict is final.
   const verdict = await dbapi.canSendMessage(row.id);
   if (!verdict?.allowed) {
-    log.info('gate refused', { messageId: row.id, reason: verdict?.reason });
+    const reason = verdict?.reason;
+    const kind = classifyRefusal(reason);
+    const retryAfter = retryAfterOf(verdict);
+
+    log.info('gate refused', { messageId: row.id, reason, retryAfter, ...kind });
 
     // A refusal that can never clear on its own is a terminal failure; leaving it
     // queued would block the conversation forever. Suppression and revoked
-    // consent are exactly that. Everything else (paused sender, in-flight,
-    // not-yet-effective consent) is transient - leave it queued.
-    if (/^suppressed:/.test(verdict?.reason ?? '') || verdict?.reason === 'consent_revoked') {
-      await dbapi.markFailed(row.id, { errorCode: `refused:${verdict.reason}`, reconciled: true });
+    // consent are exactly that.
+    //
+    // A CAP refusal is the opposite and must never fail the message: operating
+    // caps and quiet hours [guide step 36] say "not yet", not "no". The row
+    // stays `queued` and goes out unchanged once the window reopens - which is
+    // why `retry_after` is logged rather than acted on. Everything else (paused
+    // sender, in-flight, not-yet-effective consent) is transient in the same
+    // way and also stays queued.
+    if (kind.terminal) {
+      await dbapi.markFailed(row.id, { errorCode: `refused:${reason}`, reconciled: true });
     }
-    return { skipped: true, reason: verdict?.reason };
+    return { skipped: true, reason, retryAfter, capped: kind.cap, senderWide: kind.senderWide };
   }
 
   // 2. Claim it. queued -> sending. Losing this race is routine.
@@ -356,6 +367,23 @@ async function tick() {
       });
       const r = await inFlight;
       inFlight = null;
+
+      // A sender-wide cap (daily, hourly, quiet hours) refuses every message this
+      // sender has, so walking the rest of its queue would be 24 more pointless
+      // gate calls per tick. Stop here and move to the next sender; the messages
+      // stay queued and the next tick re-asks.
+      //
+      // cap_new_conversation is NOT sender-wide and deliberately does not break:
+      // it refuses only first contacts, so replies into existing threads behind
+      // it must keep flowing.
+      if (r?.senderWide) {
+        log.info('sender-wide cap reached - skipping the rest of this sender this tick', {
+          sender: sender.slug,
+          reason: r.reason,
+          retryAfter: r.retryAfter,
+        });
+        break;
+      }
 
       if (!r?.skipped) {
         didWork = true;

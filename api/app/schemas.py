@@ -183,6 +183,24 @@ class AcceptedMessage(BaseModel):
     normalized_address: str
     temp_guid: str | None = None
     queued_at: datetime
+    cap_blocked: bool = Field(
+        default=False,
+        description=(
+            "True when the message was accepted but an operating cap or quiet-hours window "
+            "(guide step 36) currently prevents it from going out. It stays `queued` and the "
+            "worker sends it when the window reopens - this is NOT a refusal, which is why the "
+            "response is still 202."
+        ),
+    )
+    cap_reason: str | None = Field(
+        default=None,
+        description="cap_daily | cap_hourly | cap_new_conversation | quiet_hours. Null when clear.",
+        examples=["cap_hourly"],
+    )
+    retry_after: datetime | None = Field(
+        default=None,
+        description="Earliest instant the cap window frees up. Advisory - nothing needs re-posting.",
+    )
 
 
 class BulkResultItem(BaseModel):
@@ -470,6 +488,74 @@ class HealthResponse(BaseModel):
     version: str
     checked_at: datetime
     note: str | None = None
+
+
+class CapWindow(BaseModel):
+    """One rolling cap window and where this sender stands in it."""
+
+    cap: int | None = Field(default=None, description="Configured ceiling. Null = no limit.")
+    used: int = Field(..., description="Messages that have consumed this window.")
+    remaining: int | None = Field(default=None, description="Null when there is no cap.")
+    window_seconds: int = Field(..., description="Length of the rolling window (86400 or 3600).")
+    oldest_in_window: datetime | None = None
+    window_resets_at: datetime | None = Field(
+        default=None, description="When the oldest counted message ages out and one slot frees up."
+    )
+    exceeded: bool = Field(..., description="True when the next send would be refused by this cap.")
+    retry_after: datetime | None = Field(
+        default=None, description="Set only while `exceeded`: when this window stops being full."
+    )
+
+
+class QuietHours(BaseModel):
+    start: str | None = Field(default=None, examples=["21:00:00"], description="Local time sending stops.")
+    end: str | None = Field(default=None, examples=["08:00:00"], description="Local time sending resumes.")
+    timezone: str | None = Field(default=None, examples=["America/Vancouver"])
+    configured: bool = False
+    in_quiet_hours: bool = False
+    resumes_at: datetime | None = Field(
+        default=None, description="Set only while inside the window. Evaluated in the sender's zone."
+    )
+    next_quiet_end: datetime | None = None
+
+
+class SenderCaps(BaseModel):
+    daily: CapWindow
+    hourly: CapWindow
+    new_conversation_daily: CapWindow = Field(
+        ...,
+        description=(
+            "FIRST-CONTACT messages only. Capped separately and more tightly than the daily "
+            "total: opening a conversation with someone who never asked to hear from us is the "
+            "riskiest thing this system does."
+        ),
+    )
+    quiet_hours: QuietHours
+
+
+class SenderDetail(SenderRef):
+    """A sender with its operating caps and live usage [guide step 36]."""
+
+    bluebubbles_url: str | None = None
+    bluebubbles_port: int | None = None
+    macos_user: str | None = None
+    timezone: str | None = None
+    caps: SenderCaps | None = None
+    blocked_by: str | None = Field(
+        default=None,
+        description=(
+            "The cap that would refuse this sender's next send right now: quiet_hours, cap_daily "
+            "or cap_hourly - or cap_new_conversation, which refuses only first contacts. Null "
+            "when nothing is binding."
+        ),
+        examples=["cap_hourly"],
+    )
+    created_at: datetime | None = None
+
+
+class SenderList(BaseModel):
+    count: int
+    senders: list[SenderDetail]
 
 
 class StatsResponse(BaseModel):

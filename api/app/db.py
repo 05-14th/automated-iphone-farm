@@ -96,6 +96,17 @@ class Database:
         res = await self.table("senders").select("*").eq("slug", slug).maybe_single().execute()
         return res.data if res else None
 
+    async def sender_cap_status(self, sender_id: str) -> dict[str, Any]:
+        """`public.sender_cap_status(sender_id)` - operating caps + current usage.
+
+        The very function `can_send()` calls to decide a cap refusal, so what an
+        operator reads here and what the gate enforces cannot disagree. Read-only
+        and advisory: this API never decides a cap itself.
+        """
+        res = await self.client.rpc("sender_cap_status", {"p_sender_id": sender_id}).execute()
+        data = res.data
+        return data if isinstance(data, dict) else {"found": False}
+
     async def get_sender_by_id(self, sender_id: str) -> dict[str, Any] | None:
         res = await self.table("senders").select("*").eq("id", sender_id).maybe_single().execute()
         return res.data if res else None

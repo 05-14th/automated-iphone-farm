@@ -77,6 +77,18 @@ export async function canSendMessage(messageId) {
   return data;
 }
 
+/**
+ * Operating caps + quiet hours for one sender, with current usage [guide step 36].
+ *
+ * The same `sender_cap_status()` the gate itself calls, so an operator display
+ * and the gate's verdict can never disagree. Read-only; it decides nothing.
+ */
+export async function senderCapStatus(senderId) {
+  const { data, error } = await db.rpc('sender_cap_status', { p_sender_id: senderId });
+  throwIf(error, 'sender_cap_status');
+  return data;
+}
+
 // ---------------------------------------------------------------------------
 // senders
 // ---------------------------------------------------------------------------
@@ -292,6 +304,12 @@ export async function recordAttempt(messageId, { httpStatus, response, outcome }
  *     in the same conversation is already sending.
  * Either way the caller gets `null` and moves on. Losing a claim is routine,
  * not an error.
+ *
+ * `messages.was_first_contact` is NOT set here. The database stamps it on this
+ * exact transition (trg_messages_stamp_first_contact), reading the
+ * conversation's provider_chat_guid itself, so the new-conversation cap counts
+ * the same thing no matter which process did the claiming and a worker cannot
+ * forget to record it. The claimed row comes back with the flag already on it.
  */
 export async function claimMessage(messageId) {
   const { data, error } = await db

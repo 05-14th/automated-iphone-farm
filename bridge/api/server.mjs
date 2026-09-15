@@ -150,6 +150,15 @@ async function postMessages(req, res, payload) {
   if (!verdict?.allowed) {
     const reason = verdict?.reason ?? 'refused';
     // 409 for a transient/ordering refusal, 403 for a policy refusal.
+    // Cap refusals are NEITHER: the message is legitimate and will send once the
+    // window reopens, so rejecting it would make the caller retry needlessly and
+    // would disagree with the Python API, which returns 202. Keep them aligned.
+    const CAP_REASONS = new Set([
+      'quiet_hours', 'cap_daily', 'cap_hourly', 'cap_new_conversation',
+    ]);
+    if (CAP_REASONS.has(reason)) {
+      // fall through to enqueue; the worker leaves it queued until the cap frees
+    } else {
     const status = reason === 'in_flight_message_exists' ? 409 : 403;
     return send(res, status, {
       error: 'refused',
@@ -157,6 +166,7 @@ async function postMessages(req, res, payload) {
       contact_id: contact.id,
       conversation_id: conversation.id,
     });
+    }
   }
 
   const message = await dbapi.enqueueOutbound({

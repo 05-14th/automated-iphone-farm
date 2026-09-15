@@ -42,8 +42,51 @@ SENDER = {
     "bluebubbles_url": "http://127.0.0.1",
     "bluebubbles_port": 12341,
     "macos_user": "imsg01",
+    "daily_cap": 200,
+    "hourly_cap": 30,
+    "new_conversation_daily_cap": 20,
+    "quiet_hours_start": "21:00:00",
+    "quiet_hours_end": "08:00:00",
+    "timezone": "America/Vancouver",
     "created_at": "2026-09-01T00:00:00Z",
 }
+
+
+def cap_window(cap=None, used=0, window_seconds=86400, exceeded=False, retry_after=None):
+    """One window of `public.sender_cap_status()`, shaped exactly as the RPC returns it."""
+    return {
+        "cap": cap,
+        "used": used,
+        "remaining": None if cap is None else max(cap - used, 0),
+        "window_seconds": window_seconds,
+        "oldest_in_window": None,
+        "window_resets_at": None,
+        "exceeded": exceeded,
+        "retry_after": retry_after,
+    }
+
+
+def cap_status(daily=None, hourly=None, new_conv=None, quiet=None):
+    return {
+        "found": True,
+        "sender_id": SENDER["id"],
+        "slug": SENDER["slug"],
+        "status": SENDER["status"],
+        "timezone": SENDER["timezone"],
+        "daily": daily or cap_window(cap=200, used=3),
+        "hourly": hourly or cap_window(cap=30, used=1, window_seconds=3600),
+        "new_conversation_daily": new_conv or cap_window(cap=20, used=2),
+        "quiet_hours": quiet
+        or {
+            "start": "21:00:00",
+            "end": "08:00:00",
+            "timezone": "America/Vancouver",
+            "configured": True,
+            "in_quiet_hours": False,
+            "resumes_at": None,
+            "next_quiet_end": "2026-09-16T15:00:00Z",
+        },
+    }
 
 
 class StubDatabase:
@@ -60,6 +103,7 @@ class StubDatabase:
         self.suppressed: set[str] = set()
         self.consented: set[str] = set()
         self.verdicts: dict[str, dict[str, Any]] = {}
+        self.cap_status: dict[str, Any] = cap_status()
         self._n = 0
 
     def _id(self, prefix: str) -> str:
@@ -71,6 +115,9 @@ class StubDatabase:
 
     async def get_senders(self, only_active: bool = False):
         return [SENDER]
+
+    async def sender_cap_status(self, sender_id: str):
+        return self.cap_status if sender_id == SENDER["id"] else {"found": False}
 
     async def get_sender_by_slug(self, slug: str):
         return SENDER if slug == "sender01" else None

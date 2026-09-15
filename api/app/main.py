@@ -27,7 +27,7 @@ from .config import get_settings
 from .db import Database
 from .errors import ApiError
 from .logging_config import configure_logging, log_context
-from .routers import compliance, contacts, conversations, inbox, messages, ops
+from .routers import compliance, contacts, conversations, inbox, messages, ops, senders
 from .version import __version__
 
 log = logging.getLogger("api")
@@ -59,6 +59,17 @@ purpose: the constraint is Apple's tolerance for a young sender identity, not
 throughput. This API cannot and will not deliver faster than that, whatever rate
 you post at.
 
+## Operating caps
+
+Each sender also carries volume caps and quiet hours (`GET /v1/senders`): a
+rolling daily total, a rolling hourly burst guard, a much tighter cap on **first
+contacts**, and a do-not-send window evaluated in the sender's own timezone.
+
+A cap-blocked message is still **accepted (202)**. It stays `queued` and goes out
+when the window reopens; the response carries `cap_blocked`, `cap_reason` and
+`retry_after` so you know why nothing has moved. Do not re-post it - that is how
+a system built to never send twice ends up sending twice.
+
 ## What a state means
 
 * `queued` - accepted, waiting. With `scheduled_for` set, waiting until then.
@@ -75,6 +86,7 @@ TAGS = [
     {"name": "conversations", "description": "Threaded view of a (contact, sender) pair."},
     {"name": "contacts", "description": "Who a contact is, who they hear from, and whether we may write."},
     {"name": "compliance", "description": "Consent ledger and the global suppression list."},
+    {"name": "senders", "description": "Sender identities, operating caps and current usage."},
     {"name": "ops", "description": "Health and stats. /v1/health needs no token."},
 ]
 
@@ -217,6 +229,7 @@ def create_app() -> FastAPI:
     app.include_router(conversations.router)
     app.include_router(contacts.router)
     app.include_router(compliance.router)
+    app.include_router(senders.router)
 
     return app
 
