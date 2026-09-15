@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.clario.bb-webhook-listener</string>
+<key>UserName</key><string>clarioinc</string>
+<key>ProgramArguments</key><array>
+  <string>/opt/homebrew/bin/node</string>
+  <string>/Users/clarioinc/automated-iphone-farm/scripts/webhook-listener.mjs</string>
+</array>
+<key>EnvironmentVariables</key><dict>
+  <key>WEBHOOK_PORT</key><string>12391</string>
+  <key>HOME</key><string>/Users/clarioinc</string>
+</dict>
+<key>WorkingDirectory</key><string>/Users/clarioinc/automated-iphone-farm</string>
+<key>RunAtLoad</key><true/>
+<key>KeepAlive</key><true/>
+<key>StandardOutPath</key><string>/Users/clarioinc/automated-iphone-farm/logs/listener.out</string>
+<key>StandardErrorPath</key><string>/Users/clarioinc/automated-iphone-farm/logs/listener.err</string>
+</dict></plist>
